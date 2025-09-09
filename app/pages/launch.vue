@@ -1,7 +1,6 @@
 <template>
     <v-container>
         <h1>SpaceX Launches</h1>
-        <!-- Filter and Sort Controls -->
         <v-row class="mb-4">
             <v-col cols="12" md="4">
                 <v-select
@@ -29,45 +28,27 @@
             </v-col>
         </v-row>
 
-        <v-row>
-            <v-col v-for="launch in sortedAndFilteredLaunches" :key="launch.id" cols="12" md="6" lg="4">
-                <v-card class="mb-4" variant="elevated" height="100%">
-                    <v-card-title class="text-h6">{{ launch.mission_name }}</v-card-title>
-                    <v-card-subtitle class="text-body-2">
-                        {{ new Date(launch.launch_date_utc).toLocaleDateString() }} • 
-                        {{ launch.rocket?.rocket_name }}
-                    </v-card-subtitle>
-                    <v-card-text>
-                        <div class="mb-2">
-                            <strong>Launch Site:</strong> {{ launch.launch_site?.site_name_long }}
-                        </div>
-                        <div class="mb-2">
-                            <strong>Rocket:</strong> {{ launch.rocket?.rocket_name }}
-                        </div>
-                        <div class="mb-2">
-                            <strong>Launch Date:</strong> {{ new Date(launch.launch_date_utc).toLocaleString() }}
-                        </div>
-                        <div v-if="launch.details">
-                            <strong>Details:</strong> 
-                            <p class="mt-1 text-body-2">{{ launch.details }}</p>
-                        </div>
-                        <div v-else class="text-body-2 font-italic text-grey">
-                            No details provided.
-                        </div>
-                    </v-card-text>
-                    <v-card-actions>
-                    </v-card-actions>
-                </v-card>
-            </v-col>
-            <v-col v-if="pending" cols="12" class="text-center">
+        <v-row v-if="pending">
+            <v-col cols="12" class="text-center">
                 <v-progress-circular indeterminate color="primary"></v-progress-circular>
                 <p class="mt-2">Loading launches...</p>
             </v-col>
-            <v-col v-if="error" cols="12">
+        </v-row>
+
+        <v-row v-else-if="error">
+            <v-col cols="12">
                 <v-alert type="error" :text="error.message"></v-alert>
             </v-col>
-            <v-col v-if="!pending && !error && sortedAndFilteredLaunches.length === 0" cols="12" class="text-center">
-                <v-alert type="info" text="No launches found for the selected year."></v-alert>
+        </v-row>
+
+        <v-row v-else>
+            <template v-if="sortedAndFilteredLaunches.length > 0">
+                <v-col v-for="launch in sortedAndFilteredLaunches" :key="launch.id" cols="12" md="6" lg="4">
+                    <LaunchCard :launch="launch" />
+                </v-col>
+            </template>
+            <v-col v-else cols="12" class="text-center">
+                <v-alert type="info" text="No launches found for the selected criteria."></v-alert>
             </v-col>
         </v-row>
     </v-container>
@@ -76,6 +57,7 @@
 <script setup lang="ts">
 import gql from 'graphql-tag'
 import { computed, ref } from 'vue'
+import LaunchCard from '~~/components/LaunchCard.vue'
 
 interface Launch {
     id: string
@@ -85,7 +67,10 @@ interface Launch {
         rocket_name: string
         rocket?: { id: string }
     }
-    launch_site: { site_name_long: string }
+    launch_site?: { 
+        site_name_long?: string
+        site_name?: string
+    } | null
     details?: string | null
 }
 
@@ -94,7 +79,7 @@ const { data, pending, error } = await useAsyncQuery<{
 }>({
     query: gql`
         query GetLaunches {
-            launches{
+            launches {
                 id
                 mission_name
                 launch_date_utc
@@ -106,6 +91,7 @@ const { data, pending, error } = await useAsyncQuery<{
                 }
                 launch_site {
                     site_name_long
+                    site_name
                 }
                 details
             }
