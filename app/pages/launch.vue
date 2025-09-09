@@ -23,7 +23,7 @@
             </v-col>
             <v-col cols="12" md="4" class="d-flex align-center">
                 <v-chip color="info">
-                    Showing {{ sortedAndFilteredLaunches.length }} of {{ launches.length }} launches
+                    Showing {{ startIndex + 1 }}-{{ endIndex }} of {{ sortedAndFilteredLaunches.length }} launches
                 </v-chip>
             </v-col>
         </v-row>
@@ -42,8 +42,8 @@
         </v-row>
 
         <v-row v-else>
-            <template v-if="sortedAndFilteredLaunches.length > 0">
-                <v-col v-for="launch in sortedAndFilteredLaunches" :key="launch.id" cols="12" md="6" lg="4">
+            <template v-if="paginatedLaunches.length > 0">
+                <v-col v-for="launch in paginatedLaunches" :key="launch.id" cols="12" md="6" lg="4">
                     <LaunchCard :launch="launch" />
                 </v-col>
             </template>
@@ -51,12 +51,24 @@
                 <v-alert type="info" text="No launches found for the selected criteria."></v-alert>
             </v-col>
         </v-row>
+
+        <v-row class="mt-4" v-if="totalPages > 1">
+            <v-col cols="12" class="d-flex justify-center">
+                <v-pagination
+                    v-model="currentPage"
+                    :length="totalPages"
+                    :total-visible="7"
+                    color="primary"
+                    variant="elevated"
+                ></v-pagination>
+            </v-col>
+        </v-row>
     </v-container>
 </template>
 
 <script setup lang="ts">
 import gql from 'graphql-tag'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import LaunchCard from '~~/components/LaunchCard.vue'
 
 interface Launch {
@@ -102,8 +114,10 @@ const { data, pending, error } = await useAsyncQuery<{
 const launches = computed(() => data.value?.launches ?? [])
 
 const selectedYear = ref<string | null>(null)
-
 const sortOrder = ref<string>('newest')
+
+const currentPage = ref(1)
+const itemsPerPage = 12
 
 const sortOptions = [
     { title: 'Newest First', value: 'newest' },
@@ -131,7 +145,7 @@ const filteredLaunches = computed(() => {
     })
 })
 
-const sortedLaunches = computed(() => {
+const sortedAndFilteredLaunches = computed(() => {
     const launchesToSort = [...filteredLaunches.value]
     
     return launchesToSort.sort((a, b) => {
@@ -146,5 +160,23 @@ const sortedLaunches = computed(() => {
     })
 })
 
-const sortedAndFilteredLaunches = computed(() => sortedLaunches.value)
+const totalPages = computed(() => {
+    return Math.ceil(sortedAndFilteredLaunches.value.length / itemsPerPage)
+})
+
+const startIndex = computed(() => {
+    return (currentPage.value - 1) * itemsPerPage
+})
+
+const endIndex = computed(() => {
+    return Math.min(startIndex.value + itemsPerPage, sortedAndFilteredLaunches.value.length)
+})
+
+const paginatedLaunches = computed(() => {
+    return sortedAndFilteredLaunches.value.slice(startIndex.value, endIndex.value)
+})
+
+watch([selectedYear, sortOrder], () => {
+    currentPage.value = 1
+})
 </script>
