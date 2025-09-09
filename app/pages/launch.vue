@@ -1,8 +1,7 @@
 <template>
     <v-container>
         <h1>SpaceX Launches</h1>
-
-        <!-- Year Filter -->
+        <!-- Filter and Sort Controls -->
         <v-row class="mb-4">
             <v-col cols="12" md="4">
                 <v-select
@@ -14,15 +13,24 @@
                     prepend-inner-icon="mdi-calendar"
                 ></v-select>
             </v-col>
-            <v-col cols="12" md="8" class="d-flex align-center">
+            <v-col cols="12" md="4">
+                <v-select
+                    v-model="sortOrder"
+                    :items="sortOptions"
+                    label="Sort by Launch Date"
+                    variant="outlined"
+                    prepend-inner-icon="mdi-sort"
+                ></v-select>
+            </v-col>
+            <v-col cols="12" md="4" class="d-flex align-center">
                 <v-chip color="info">
-                    Showing {{ filteredLaunches.length }} of {{ launches.length }} launches
+                    Showing {{ sortedAndFilteredLaunches.length }} of {{ launches.length }} launches
                 </v-chip>
             </v-col>
         </v-row>
 
         <v-row>
-            <v-col v-for="launch in filteredLaunches" :key="launch.id" cols="12" md="6" lg="4">
+            <v-col v-for="launch in sortedAndFilteredLaunches" :key="launch.id" cols="12" md="6" lg="4">
                 <v-card class="mb-4" variant="elevated" height="100%">
                     <v-card-title class="text-h6">{{ launch.mission_name }}</v-card-title>
                     <v-card-subtitle class="text-body-2">
@@ -58,7 +66,7 @@
             <v-col v-if="error" cols="12">
                 <v-alert type="error" :text="error.message"></v-alert>
             </v-col>
-            <v-col v-if="!pending && !error && filteredLaunches.length === 0" cols="12" class="text-center">
+            <v-col v-if="!pending && !error && sortedAndFilteredLaunches.length === 0" cols="12" class="text-center">
                 <v-alert type="info" text="No launches found for the selected year."></v-alert>
             </v-col>
         </v-row>
@@ -86,7 +94,7 @@ const { data, pending, error } = await useAsyncQuery<{
 }>({
     query: gql`
         query GetLaunches {
-            launches(limit: 100) {
+            launches{
                 id
                 mission_name
                 launch_date_utc
@@ -109,6 +117,13 @@ const launches = computed(() => data.value?.launches ?? [])
 
 const selectedYear = ref<string | null>(null)
 
+const sortOrder = ref<string>('newest')
+
+const sortOptions = [
+    { title: 'Newest First', value: 'newest' },
+    { title: 'Oldest First', value: 'oldest' }
+]
+
 const availableYears = computed(() => {
     const years = new Set<string>()
     launches.value.forEach(launch => {
@@ -116,7 +131,7 @@ const availableYears = computed(() => {
         years.add(year)
     })
     
-    return Array.from(years).sort((a, b) => b.localeCompare(a)) // Sort newest first
+    return Array.from(years).sort((a, b) => b.localeCompare(a))
 })
 
 const filteredLaunches = computed(() => {
@@ -129,4 +144,21 @@ const filteredLaunches = computed(() => {
         return launchYear === selectedYear.value
     })
 })
+
+const sortedLaunches = computed(() => {
+    const launchesToSort = [...filteredLaunches.value]
+    
+    return launchesToSort.sort((a, b) => {
+        const dateA = new Date(a.launch_date_utc).getTime()
+        const dateB = new Date(b.launch_date_utc).getTime()
+        
+        if (sortOrder.value === 'newest') {
+            return dateB - dateA
+        } else {
+            return dateA - dateB
+        }
+    })
+})
+
+const sortedAndFilteredLaunches = computed(() => sortedLaunches.value)
 </script>
